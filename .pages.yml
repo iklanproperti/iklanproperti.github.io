@@ -1,20 +1,78 @@
-site_name: Info Properti Bandung & Cimahi
-description: Platform terpercaya penawaran tanah kavling, rumah, dan rukos investasi di Bandung, Cimahi, Jatinangor, dan Cileunyi.
-base_url: https://infoproperti.github.io
-contact_whatsapp: "08212334550"
-instagram: "@info.jualproperti"
+media:
+  input: assets/images/properti
+  output: /assets/images/properti
 
-collections:
-  - name: properties
-    label: "Daftar Properti"
-    folder: "_properties"
-    create: true
+content:
+  - name: properti
+    label: Listing Properti
+    type: collection
+    path: content/properti
+    format: yaml-frontmatter
+    filename: "{year}-{month}-{day}-{primary}.md"
+    view:
+      fields: [title, harga, lokasi, kategori, status]
+      primary: title
+      sort: [date, title]
+      default:
+        sort: date
+        order: desc
     fields:
-      - {label: "Judul Properti", name: "title", widget: "string"}
-      - {label: "Kategori", name: "category", widget: "select", options: ["Kavling Tanah", "Rumah", "Rukos"]}
-      - {label: "Luas Tanah (m²)", name: "land_area", widget: "number"}
-      - {label: "Luas Bangunan (m²)", name: "building_area", widget: "number", required: false}
-      - {label: "Harga", name: "price", widget: "string"}
-      - {label: "Lokasi", name: "location", widget: "string"}
-      - {label: "Deskripsi Singkat", name: "description", widget: "text"}
-      - {label: "WhatsApp Kontak", name: "whatsapp", widget: "string", default: "08212334550"}
+      - name: title
+        label: Judul Properti
+        type: string
+        required: true
+      - name: harga
+        label: Harga (Contoh: Rp 450 Juta / Rp 1,2 M)
+        type: string
+        required: true
+      - name: kategori
+        label: Kategori Properti
+        type: select
+        options:
+          values: [Rumah, Kavling Tanah, Ruko, Apartemen, Villa]
+        default: Rumah
+      - name: status
+        label: Status Penjualan
+        type: select
+        options:
+          values: [Tersedia, Promo, Booking Fee, Terjual]
+        default: Tersedia
+      - name: lokasi
+        label: Lokasi / Kawasan (Contoh: Arcamanik, Bandung)
+        type: string
+        required: true
+      - name: luas_tanah
+        label: Luas Tanah (m²)
+        type: number
+      - name: luas_bangunan
+        label: Luas Bangunan (m²)
+        type: number
+      - name: kamar_tidur
+        label: Kamar Tidur
+        type: number
+      - name: kamar_mandi
+        label: Kamar Mandi
+        type: number
+      - name: legalitas
+        label: Legalitas (SHM / HGB / AJB)
+        type: string
+        default: SHM & PBG
+      - name: gambar_utama
+        label: Foto Utama Properti
+        type: image
+        required: true
+      - name: galeri
+        label: Galeri Foto Tambahan
+        type: image
+        options:
+          multiple: true
+      - name: fitur_unggulan
+        label: Keunggulan Lokasi & Fasilitas
+        type: list
+      - name: date
+        label: Tanggal Posting
+        type: date
+        default: now
+      - name: body
+        label: Deskripsi Lengkap & Skema Pembayaran
+        type: rich-text
