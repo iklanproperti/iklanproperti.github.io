@@ -1,0 +1,24 @@
+version: '1.0'
+site:
+  title: "Info Properti Bandung & Cimahi"
+  description: "Platform Pemasaran Tanah Kavling, Rumah, dan Rukos Strategis"
+  url: "https://infoproperti.github.io"
+  author: "Info Properti Team"
+
+content:
+  collections:
+    - name: "properties"
+      label: "Daftar Properti"
+      path: "content/properties"
+      format: "json"
+      fields:
+        - { name: "title", label: "Judul Properti", type: "string", required: true }
+        - { name: "type", label: "Jenis Properti", type: "select", options: ["Tanah Kavling", "Rumah 2 Lantai", "Rukos Kost"] }
+        - { name: "location", label: "Lokasi", type: "string", required: true }
+        - { name: "price", label: "Harga", type: "string", required: true }
+        - { name: "image", label: "URL Gambar", type: "string" }
+        - { name: "description", label: "Deskripsi", type: "markdown", required: true }
+
+build:
+  command: "node build.js"
+  output: "dist"
