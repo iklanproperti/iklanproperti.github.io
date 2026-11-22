@@ -1,24 +1,20 @@
-version: '1.0'
-site:
-  title: "Info Properti Bandung & Cimahi"
-  description: "Platform Pemasaran Tanah Kavling, Rumah, dan Rukos Strategis"
-  url: "https://infoproperti.github.io"
-  author: "Info Properti Team"
+site_name: Info Properti Bandung & Cimahi
+description: Platform terpercaya penawaran tanah kavling, rumah, dan rukos investasi di Bandung, Cimahi, Jatinangor, dan Cileunyi.
+base_url: https://infoproperti.github.io
+contact_whatsapp: "08212334550"
+instagram: "@info.jualproperti"
 
-content:
-  collections:
-    - name: "properties"
-      label: "Daftar Properti"
-      path: "content/properties"
-      format: "json"
-      fields:
-        - { name: "title", label: "Judul Properti", type: "string", required: true }
-        - { name: "type", label: "Jenis Properti", type: "select", options: ["Tanah Kavling", "Rumah 2 Lantai", "Rukos Kost"] }
-        - { name: "location", label: "Lokasi", type: "string", required: true }
-        - { name: "price", label: "Harga", type: "string", required: true }
-        - { name: "image", label: "URL Gambar", type: "string" }
-        - { name: "description", label: "Deskripsi", type: "markdown", required: true }
-
-build:
-  command: "node build.js"
-  output: "dist"
+collections:
+  - name: properties
+    label: "Daftar Properti"
+    folder: "_properties"
+    create: true
+    fields:
+      - {label: "Judul Properti", name: "title", widget: "string"}
+      - {label: "Kategori", name: "category", widget: "select", options: ["Kavling Tanah", "Rumah", "Rukos"]}
+      - {label: "Luas Tanah (m²)", name: "land_area", widget: "number"}
+      - {label: "Luas Bangunan (m²)", name: "building_area", widget: "number", required: false}
+      - {label: "Harga", name: "price", widget: "string"}
+      - {label: "Lokasi", name: "location", widget: "string"}
+      - {label: "Deskripsi Singkat", name: "description", widget: "text"}
+      - {label: "WhatsApp Kontak", name: "whatsapp", widget: "string", default: "08212334550"}
