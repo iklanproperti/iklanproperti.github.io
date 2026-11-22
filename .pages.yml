@@ -18,61 +18,61 @@ content:
         order: desc
     fields:
       - name: title
-        label: Judul Properti
+        label: "Judul Properti"
         type: string
         required: true
       - name: harga
-        label: Harga (Contoh: Rp 450 Juta / Rp 1,2 M)
+        label: "Harga (Contoh: Rp 450 Juta / Rp 1,2 M)"
         type: string
         required: true
       - name: kategori
-        label: Kategori Properti
+        label: "Kategori Properti"
         type: select
         options:
           values: [Rumah, Kavling Tanah, Ruko, Apartemen, Villa]
         default: Rumah
       - name: status
-        label: Status Penjualan
+        label: "Status Penjualan"
         type: select
         options:
           values: [Tersedia, Promo, Booking Fee, Terjual]
         default: Tersedia
       - name: lokasi
-        label: Lokasi / Kawasan (Contoh: Arcamanik, Bandung)
+        label: "Lokasi atau Kawasan (Contoh: Arcamanik, Bandung)"
         type: string
         required: true
       - name: luas_tanah
-        label: Luas Tanah (m²)
+        label: "Luas Tanah (m2)"
         type: number
       - name: luas_bangunan
-        label: Luas Bangunan (m²)
+        label: "Luas Bangunan (m2)"
         type: number
       - name: kamar_tidur
-        label: Kamar Tidur
+        label: "Kamar Tidur"
         type: number
       - name: kamar_mandi
-        label: Kamar Mandi
+        label: "Kamar Mandi"
         type: number
       - name: legalitas
-        label: Legalitas (SHM / HGB / AJB)
+        label: "Legalitas (SHM / HGB / AJB)"
         type: string
-        default: SHM & PBG
+        default: "SHM & PBG"
       - name: gambar_utama
-        label: Foto Utama Properti
+        label: "Foto Utama Properti"
         type: image
         required: true
       - name: galeri
-        label: Galeri Foto Tambahan
+        label: "Galeri Foto Tambahan"
         type: image
         options:
           multiple: true
       - name: fitur_unggulan
-        label: Keunggulan Lokasi & Fasilitas
+        label: "Keunggulan Lokasi dan Fasilitas"
         type: list
       - name: date
-        label: Tanggal Posting
+        label: "Tanggal Posting"
         type: date
         default: now
       - name: body
-        label: Deskripsi Lengkap & Skema Pembayaran
+        label: "Deskripsi Lengkap dan Skema Pembayaran"
         type: rich-text
