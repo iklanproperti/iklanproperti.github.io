@@ -10,7 +10,7 @@ const GITHUB_CONFIG = {
 let allListings = [];
 let currentFiltered = [];
 
-// Parser YAML Frontmatter yang mendukung string, angka, list (- item), maupun inline array (["a", "b"])
+// Parser YAML Frontmatter lengkap (mendukung multi-line string, >- block scalar, & list)
 function parseFrontmatterClient(raw) {
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { data: {}, body: raw };
@@ -18,36 +18,64 @@ function parseFrontmatterClient(raw) {
   const lines = match[1].split(/\r?\n/);
   const data = {};
   let currentKey = null;
+  let blockMode = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
 
-    // Tangani item array YAML (- item atau   - item)
-    if (trimmed.startsWith('- ') && currentKey) {
+    // Tangani baris kosong di dalam block scalar (>-)
+    if (!trimmed) {
+      if (blockMode && currentKey && typeof data[currentKey] === 'string' && data[currentKey].length > 0) {
+        data[currentKey] += '\n';
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith('#')) continue;
+
+    // 1. Item list YAML (- item atau   - item)
+    if (/^\s*-\s+/.test(line) && currentKey && !blockMode) {
       if (!Array.isArray(data[currentKey])) data[currentKey] = [];
-      const itemVal = trimmed.replace(/^-\s*/, '').replace(/^["']|["']$/g, '');
+      const itemVal = trimmed.replace(/^-\s+/, '').replace(/^["']|["']$/g, '');
       data[currentKey].push(itemVal);
       continue;
     }
 
+    // 2. Baris lanjutan yang menjorok (indentasi spasi) untuk multi-line string atau >-
+    if (/^\s+/.test(line) && currentKey) {
+      if (blockMode) {
+        data[currentKey] = data[currentKey]
+          ? `${data[currentKey]}\n${trimmed}`
+          : trimmed;
+      } else if (typeof data[currentKey] === 'string') {
+        data[currentKey] = `${data[currentKey]} ${trimmed}`.replace(/^["']|["']$/g, '').trim();
+      }
+      continue;
+    }
+
+    // 3. Key baru di level root (tidak diawali spasi)
     const idx = line.indexOf(':');
     if (idx !== -1) {
       const key = line.slice(0, idx).trim();
       let val = line.slice(idx + 1).trim();
       currentKey = key;
+      blockMode = false;
 
-      if (val === '') {
+      if (val === '>-' || val === '|' || val === '>' || val === '|-') {
+        blockMode = true;
+        data[key] = '';
+      } else if (val === '') {
         data[key] = [];
       } else if (val.startsWith('[') && val.endsWith(']')) {
-        // Tangani inline array: ["A", "B"]
         const inner = val.slice(1, -1).trim();
         data[key] = inner
           ? inner.split(',').map(s => s.trim().replace(/^["']|["']$/g, ''))
           : [];
       } else {
-        val = val.replace(/^["']|["']$/g, '');
-        if (!isNaN(val) && val !== '') val = Number(val);
+        val = val.replace(/^["']|["']$/g, '').trim();
+        if (!isNaN(val) && val !== '' && key !== 'harga') {
+          val = Number(val);
+        }
         data[key] = val;
       }
     }
@@ -56,22 +84,58 @@ function parseFrontmatterClient(raw) {
   return { data, body: match[2].trim() };
 }
 
-// Ubah markdown sederhana pada body deskripsi menjadi HTML rapi
-function formatBodyHtml(text) {
-  if (!text) return '';
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n{2,}/g, '</p><p>')
-    .replace(/\n/g, '<br>')
-    .replace(/^/, '<p>')
-    .replace(/$/, '</p>');
+// Format harga otomatis (jika angka murni seperti "229500000" -> "Rp 229.500.000")
+function formatHarga(harga) {
+  if (!harga) return '-';
+  const str = String(harga).trim();
+  if (/^\d+$/.test(str)) {
+    return 'Rp ' + Number(str).toLocaleString('id-ID');
+  }
+  return str;
 }
 
-// Resolusi path gambar dari Pages CMS ke URL raw GitHub
+// Konversi Markdown sederhana pada deskripsi menjadi HTML rapi
+function formatMarkdownHtml(text) {
+  if (!text) return '';
+  const lines = text.split(/\r?\n/);
+  let html = '';
+  let inList = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      if (inList) {
+        html += '</ul>';
+        inList = false;
+      }
+      continue;
+    }
+
+    const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    if (formatted.startsWith('- ')) {
+      if (!inList) {
+        html += '<ul style="margin: 8px 0 14px 20px; line-height: 1.6;">';
+        inList = true;
+      }
+      html += `<li>${formatted.slice(2)}</li>`;
+    } else {
+      if (inList) {
+        html += '</ul>';
+        inList = false;
+      }
+      html += `<p style="margin-bottom: 10px;">${formatted}</p>`;
+    }
+  }
+
+  if (inList) html += '</ul>';
+  return html;
+}
+
+// Resolusi path gambar Pages CMS ke URL raw GitHub
 function resolveImageUrl(rawImg) {
   if (!rawImg) return '';
   if (rawImg.startsWith('http://') || rawImg.startsWith('https://')) return rawImg;
-
   const cleanPath = rawImg.replace(/^\/+/, '');
   return `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${encodeURI(cleanPath)}`;
 }
@@ -81,7 +145,7 @@ function getFeaturedImage(item) {
   return resolveImageUrl(rawImg);
 }
 
-// Ambil seluruh postingan .md langsung dari folder Pages CMS di GitHub
+// Ambil semua file .md dari folder content/properti di GitHub
 async function fetchFromPagesCMS() {
   const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.folder}?ref=${GITHUB_CONFIG.branch}&t=${Date.now()}`;
   const res = await fetch(apiUrl);
@@ -113,7 +177,6 @@ async function loadListings() {
   const count = document.getElementById('listingCount');
   if (count) count.textContent = 'Menyinkronkan listing dari Pages CMS...';
 
-  // 1. Ambil langsung dari folder content/properti Pages CMS di GitHub
   try {
     const cmsData = await fetchFromPagesCMS();
     if (cmsData && cmsData.length > 0) {
@@ -126,7 +189,6 @@ async function loadListings() {
     console.warn('Gagal mengambil langsung dari GitHub API, beralih ke data/listings.json:', e);
   }
 
-  // 2. Fallback ke data/listings.json jika tersedia
   try {
     const res = await fetch(`data/listings.json?t=${Date.now()}`, { cache: 'no-store' });
     if (res.ok) {
@@ -142,7 +204,6 @@ async function loadListings() {
     console.warn('Gagal memuat data/listings.json:', e);
   }
 
-  // 3. Jika belum ada postingan
   allListings = [];
   currentFiltered = [];
   renderListings([]);
@@ -167,8 +228,9 @@ function renderListings(items) {
     const isKavling = (item.kategori || '').toLowerCase().includes('kavling');
     const statusClass = item.status === 'Terjual' ? 'terjual' : '';
     const imgUrl = getFeaturedImage(item);
+    const hargaTampil = formatHarga(item.harga);
     const waText = encodeURIComponent(
-      `Halo Widy, saya tertarik dengan properti "${item.title}" (${item.harga}) di ${item.lokasi}. Boleh minta info detail & jadwal survey?`
+      `Halo Widy, saya tertarik dengan properti "${item.title}" (${hargaTampil}) di ${item.lokasi}. Boleh minta info detail & jadwal survey?`
     );
 
     const spec3 = isKavling
@@ -186,7 +248,7 @@ function renderListings(items) {
           <span class="badge-legalitas">${item.legalitas || 'SHM'}</span>
         </div>
         <div class="card-body">
-          <div class="card-price">${item.harga || '-'}</div>
+          <div class="card-price">${hargaTampil}</div>
           <h3 class="card-title">${item.title || 'Tanpa Judul'}</h3>
           <div class="card-location">&#128205; ${item.lokasi || '-'}</div>
           <div class="card-specs">
@@ -243,8 +305,9 @@ function openModal(idx) {
 
   const isKavling = (item.kategori || '').toLowerCase().includes('kavling');
   const mainImg = getFeaturedImage(item);
+  const hargaTampil = formatHarga(item.harga);
   const waText = encodeURIComponent(
-    `Halo Widy, saya ingin jadwalkan survey untuk "${item.title}" (${item.harga}) di ${item.lokasi}.`
+    `Halo Widy, saya ingin jadwalkan survey untuk "${item.title}" (${hargaTampil}) di ${item.lokasi}.`
   );
 
   const galeriHtml =
@@ -260,11 +323,18 @@ function openModal(idx) {
         </div>`
       : '';
 
-  const fiturHtml =
-    Array.isArray(item.fitur_unggulan) && item.fitur_unggulan.length > 0
-      ? `<h4 style="color: var(--navy); margin-top: 16px;">Keunggulan Lokasi & Fasilitas:</h4>
-         <ul class="modal-features">${item.fitur_unggulan.map(f => `<li>${f}</li>`).join('')}</ul>`
-      : '';
+  // Tangani fitur_unggulan baik berupa array maupun teks paragraf (>-)
+  let fiturHtml = '';
+  if (Array.isArray(item.fitur_unggulan) && item.fitur_unggulan.length > 0) {
+    fiturHtml = `
+      <h4 style="color: var(--navy); margin-top: 16px;">Keunggulan Lokasi & Fasilitas:</h4>
+      <ul class="modal-features">${item.fitur_unggulan.map(f => `<li>${f}</li>`).join('')}</ul>`;
+  } else if (typeof item.fitur_unggulan === 'string' && item.fitur_unggulan.trim() !== '') {
+    fiturHtml = `
+      <div style="background: #f8f7f4; padding: 14px 16px; border-radius: 10px; margin-top: 16px; border-left: 4px solid var(--gold, #c59b27);">
+        ${formatMarkdownHtml(item.fitur_unggulan)}
+      </div>`;
+  }
 
   document.getElementById('modalBody').innerHTML = `
     ${mainImg ? `<img src="${mainImg}" alt="${item.title}" class="modal-img" id="modalMainImg" />` : ''}
@@ -274,7 +344,7 @@ function openModal(idx) {
       <span class="badge badge-status">${item.status || 'Tersedia'}</span>
     </div>
     <h2 style="color: var(--navy); line-height:1.3; margin-bottom:6px;">${item.title}</h2>
-    <div class="card-price">${item.harga}</div>
+    <div class="card-price">${hargaTampil}</div>
     <p style="color: var(--gray-text); font-size:0.94rem;">&#128205; ${item.lokasi}</p>
 
     <div class="modal-specs-box">
@@ -284,7 +354,7 @@ function openModal(idx) {
       <div><strong>${item.legalitas || 'SHM'}</strong>Legalitas</div>
     </div>
 
-    <div class="modal-desc">${formatBodyHtml(item.deskripsi)}</div>
+    <div class="modal-desc">${formatMarkdownHtml(item.deskripsi)}</div>
     ${fiturHtml}
 
     <div style="margin-top: 24px;">
@@ -302,17 +372,13 @@ function closeModal() {
 }
 
 function handleBackdropClick(e) {
-  if (e.target.id === 'propertyModal') {
-    closeModal();
-  }
+  if (e.target.id === 'propertyModal') closeModal();
 }
 
-// Tutup modal dengan tombol ESC
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
 });
 
-// Toggle menu mobile di navbar
 const mobileToggle = document.getElementById('mobileToggle');
 const navLinks = document.getElementById('navLinks');
 if (mobileToggle && navLinks) {
@@ -321,7 +387,6 @@ if (mobileToggle && navLinks) {
   });
 }
 
-// Event Listener Chip Kategori Cepat
 document.querySelectorAll('.chip').forEach(btn => {
   btn.addEventListener('click', () => {
     document.getElementById('kategoriFilter').value = btn.dataset.kat;
@@ -329,7 +394,6 @@ document.querySelectorAll('.chip').forEach(btn => {
   });
 });
 
-// Jalankan filter saat menekan Enter di kotak pencarian
 const searchInput = document.getElementById('searchInput');
 if (searchInput) {
   searchInput.addEventListener('keyup', e => {
@@ -337,5 +401,4 @@ if (searchInput) {
   });
 }
 
-// Muat data listing otomatis saat halaman terbuka
 document.addEventListener('DOMContentLoaded', loadListings);
