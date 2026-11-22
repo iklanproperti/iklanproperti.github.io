@@ -1,39 +1,28 @@
 const WA_NUMBER = '628212334550';
 
-// Isi username GitHub & nama repo Anda agar beranda membaca folder content/properti secara real-time
+// Deteksi otomatis username GitHub & nama repo dari URL GitHub Pages (*.github.io/nama-repo/)
+// Jika memakai custom domain, isi manual owner dan repo di bawah ini.
+function detectGitHubRepo() {
+  const host = window.location.hostname;
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  if (host.endsWith('.github.io')) {
+    const owner = host.replace('.github.io', '');
+    const repo = pathParts.length > 0 ? pathParts[0] : `${owner}.github.io`;
+    return { owner, repo };
+  }
+  return { owner: '', repo: '' };
+}
+
+const detected = detectGitHubRepo();
 const GITHUB_CONFIG = {
-  owner: 'iklanproperti', // Contoh: 'adsmosfer'
-  repo: 'iklanproperti.github.io',  // Contoh: 'properti-bandung'
+  owner: detected.owner || 'iklanproperti', // Isi manual jika pakai custom domain (misal: 'adsmosfer')
+  repo: detected.repo || 'iklanproperti.github.io',   // Isi manual jika pakai custom domain (misal: 'properti-bandung')
   branch: 'main',
   folder: 'content/properti'
 };
 
 let allListings = [];
 let currentFiltered = [];
-
-const fallbackListings = [
-  {
-    title: "Diskon Hemat Rp 94,5 Juta Kavling Investasi Sagaracipta Hanya Rp 850 Ribu/m²",
-    harga: "Rp 229,5 Juta (Rp 850 Rb/m²)",
-    kategori: "Kavling Tanah",
-    status: "Promo",
-    lokasi: "Sagaracipta, Ciparay, Bandung",
-    luas_tanah: 270,
-    luas_bangunan: 0,
-    kamar_tidur: 0,
-    kamar_mandi: 0,
-    legalitas: "SHM Pecah",
-    gambar_utama: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=900&q=80",
-    fitur_unggulan: [
-      "Diskon hemat Rp 94,5 Juta dari harga normal Rp 1,2 Juta/m² (Rp 324 Juta)",
-      "Kontur tanah datar 270 m², siap langsung bangun tanpa biaya urug",
-      "Legalitas SHM sudah pecah per unit, aman dan siap balik nama",
-      "Akses jalan sudah dicor beton mulus dan berada di jalur aktif kendaraan",
-      "Selangkah menuju SDN Negeri Sagaracipta & Kantor Desa Sagaracipta"
-    ],
-    deskripsi: "Kesempatan emas memiliki aset tanah kavling luas di kawasan berkembang Sagaracipta, Ciparay dengan potongan diskon spesial.\n\nHarga Normal: Rp 1.200.000/m² (Rp 324.000.000)\nHarga Promo: Rp 850.000/m² (Rp 229.500.000)"
-  }
-];
 
 function parseFrontmatterClient(raw) {
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
@@ -67,45 +56,43 @@ function parseFrontmatterClient(raw) {
   return { data, body: match[2].trim() };
 }
 
-// Ambil gambar dari berbagai kemungkinan nama field di Pages CMS
+// Ambil gambar dari field Pages CMS (gambar_utama / coverImage / thumbnail)
 function getFeaturedImage(item) {
   const rawImg = item.gambar_utama || item.coverImage || item.thumbnail || item.image || item.foto || '';
-  if (!rawImg) {
-    return "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=900&q=80";
-  }
-  if (rawImg.startsWith("http://") || rawImg.startsWith("https://")) {
-    return rawImg;
-  }
+  if (!rawImg) return '';
+  if (rawImg.startsWith('http://') || rawImg.startsWith('https://')) return rawImg;
 
-  const cleanPath = rawImg.replace(/^\/+/, "");
-
+  const cleanPath = rawImg.replace(/^\/+/, '');
   if (GITHUB_CONFIG.owner && GITHUB_CONFIG.repo) {
     return `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${encodeURI(cleanPath)}`;
   }
-
   return encodeURI(cleanPath);
 }
 
 function resolveGalleryImage(imgPath) {
   if (!imgPath) return '';
-  if (imgPath.startsWith("http://") || imgPath.startsWith("https://")) return imgPath;
-  const cleanPath = imgPath.replace(/^\/+/, "");
+  if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) return imgPath;
+  const cleanPath = imgPath.replace(/^\/+/, '');
   if (GITHUB_CONFIG.owner && GITHUB_CONFIG.repo) {
     return `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${encodeURI(cleanPath)}`;
   }
   return encodeURI(cleanPath);
 }
 
-async function fetchDirectFromGitHub() {
+// Ambil seluruh postingan .md langsung dari folder Pages CMS di GitHub
+async function fetchFromPagesCMS() {
   if (!GITHUB_CONFIG.owner || !GITHUB_CONFIG.repo) return null;
+
   const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.folder}?ref=${GITHUB_CONFIG.branch}&t=${Date.now()}`;
   const res = await fetch(apiUrl);
   if (!res.ok) return null;
 
   const files = await res.json();
+  if (!Array.isArray(files)) return null;
+
   const mdFiles = files.filter(f => f.name.endsWith('.md'));
   const items = await Promise.all(mdFiles.map(async f => {
-    const mdRes = await fetch(f.download_url);
+    const mdRes = await fetch(`${f.download_url}?t=${Date.now()}`);
     const text = await mdRes.text();
     const { data, body } = parseFrontmatterClient(text);
     return { slug: f.name.replace(/\.md$/, ''), ...data, deskripsi: body };
@@ -115,16 +102,23 @@ async function fetchDirectFromGitHub() {
 }
 
 async function loadListings() {
+  const count = document.getElementById('listingCount');
+  count.textContent = 'Menyinkronkan listing dari Pages CMS...';
+
+  // 1. Ambil langsung dari folder content/properti Pages CMS di GitHub
   try {
-    const ghData = await fetchDirectFromGitHub();
-    if (ghData && ghData.length > 0) {
-      allListings = ghData;
+    const cmsData = await fetchFromPagesCMS();
+    if (cmsData && cmsData.length > 0) {
+      allListings = cmsData;
       currentFiltered = [...allListings];
       renderListings(currentFiltered);
       return;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Gagal mengambil langsung dari GitHub API, beralih ke data/listings.json:', e);
+  }
 
+  // 2. Fallback ke data/listings.json hasil build Node.js dari postingan Pages CMS
   try {
     const res = await fetch(`data/listings.json?t=${Date.now()}`, { cache: 'no-store' });
     if (res.ok) {
@@ -136,11 +130,14 @@ async function loadListings() {
         return;
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Gagal memuat data/listings.json:', e);
+  }
 
-  allListings = fallbackListings;
-  currentFiltered = [...allListings];
-  renderListings(currentFiltered);
+  // 3. Jika belum ada satu pun postingan di Pages CMS
+  allListings = [];
+  currentFiltered = [];
+  renderListings([]);
 }
 
 function renderListings(items) {
@@ -151,9 +148,9 @@ function renderListings(items) {
   if (items.length === 0) {
     grid.innerHTML = `
       <div style="grid-column: 1/-1; text-align:center; padding: 48px 20px; background: #fff; border-radius: 12px; border: 1px solid #e6e2da;">
-        <h3 style="color: var(--navy); margin-bottom: 8px;">Properti Tidak Ditemukan</h3>
-        <p style="color: var(--gray-text); margin-bottom: 16px;">Coba ubah kata kunci lokasi atau reset filter pencarian Anda.</p>
-        <button class="btn-filter" onclick="resetFilters()">Tampilkan Semua Properti</button>
+        <h3 style="color: var(--navy); margin-bottom: 8px;">Belum Ada Listing Properti</h3>
+        <p style="color: var(--gray-text); margin-bottom: 16px;">Tambahkan postingan properti baru melalui Pages CMS pada folder <code>content/properti</code>, lalu muat ulang halaman ini.</p>
+        <button class="btn-filter" onclick="resetFilters()">Muat Ulang Listing</button>
       </div>`;
     return;
   }
@@ -171,7 +168,7 @@ function renderListings(items) {
     return `
       <article class="property-card">
         <div class="card-image">
-          <img src="${imgUrl}" alt="${item.title}" loading="lazy" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=900&q=80';" />
+          ${imgUrl ? `<img src="${imgUrl}" alt="${item.title}" loading="lazy" />` : ''}
           <div class="badge-group">
             <span class="badge badge-kategori">${item.kategori || 'Properti'}</span>
             <span class="badge badge-status ${statusClass}">${item.status || 'Tersedia'}</span>
@@ -179,9 +176,9 @@ function renderListings(items) {
           <span class="badge-legalitas">${item.legalitas || 'SHM'}</span>
         </div>
         <div class="card-body">
-          <div class="card-price">${item.harga}</div>
-          <h3 class="card-title">${item.title}</h3>
-          <div class="card-location">&#128205; ${item.lokasi}</div>
+          <div class="card-price">${item.harga || '-'}</div>
+          <h3 class="card-title">${item.title || 'Tanpa Judul'}</h3>
+          <div class="card-location">&#128205; ${item.lokasi || '-'}</div>
           <div class="card-specs">
             <div class="spec-item"><strong>${item.luas_tanah ? item.luas_tanah + ' m²' : '-'}</strong>Luas Tanah</div>
             <div class="spec-item"><strong>${isKavling ? 'Datar' : (item.luas_bangunan ? item.luas_bangunan + ' m²' : '-')}</strong>${isKavling ? 'Kontur' : 'Bangunan'}</div>
@@ -223,7 +220,7 @@ function resetFilters() {
   document.getElementById('searchInput').value = '';
   document.getElementById('kategoriFilter').value = '';
   document.getElementById('statusFilter').value = '';
-  applyFilters();
+  loadListings();
 }
 
 function openModal(idx) {
@@ -236,10 +233,10 @@ function openModal(idx) {
 
   const galeriHtml = Array.isArray(item.galeri) && item.galeri.length > 0
     ? `<div class="modal-gallery">
-        <img src="${mainImg}" alt="Utama" onclick="document.getElementById('modalMainImg').src='${mainImg}'" />
+        ${mainImg ? `<img src="${mainImg}" alt="Utama" onclick="document.getElementById('modalMainImg').src='${mainImg}'" />` : ''}
         ${item.galeri.map(g => {
           const gUrl = resolveGalleryImage(g);
-          return `<img src="${gUrl}" alt="Galeri" onclick="document.getElementById('modalMainImg').src='${gUrl}'" />`;
+          return gUrl ? `<img src="${gUrl}" alt="Galeri" onclick="document.getElementById('modalMainImg').src='${gUrl}'" />` : '';
         }).join('')}
       </div>`
     : '';
@@ -250,7 +247,7 @@ function openModal(idx) {
     : '';
 
   document.getElementById('modalBody').innerHTML = `
-    <img src="${mainImg}" alt="${item.title}" class="modal-img" id="modalMainImg" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=900&q=80';" />
+    ${mainImg ? `<img src="${mainImg}" alt="${item.title}" class="modal-img" id="modalMainImg" />` : ''}
     ${galeriHtml}
     <div style="display:flex; gap:8px; margin-bottom:10px;">
       <span class="badge badge-kategori">${item.kategori || 'Properti'}</span>
@@ -277,36 +274,4 @@ function openModal(idx) {
     </div>
   `;
 
-  document.getElementById('propertyModal').classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeModal() {
-  document.getElementById('propertyModal').classList.remove('active');
-  document.body.style.overflow = '';
-}
-
-function handleBackdropClick(e) {
-  if (e.target.id === 'propertyModal') closeModal();
-}
-
-document.getElementById('searchInput').addEventListener('input', applyFilters);
-document.getElementById('kategoriFilter').addEventListener('change', applyFilters);
-document.getElementById('statusFilter').addEventListener('change', applyFilters);
-
-document.querySelectorAll('.chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    document.getElementById('kategoriFilter').value = chip.dataset.kat;
-    applyFilters();
-  });
-});
-
-document.getElementById('mobileToggle').addEventListener('click', () => {
-  document.getElementById('navLinks').classList.toggle('open');
-});
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeModal();
-});
-
-loadListings();
+  document.getElementById('propertyModal').classList
