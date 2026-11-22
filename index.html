@@ -12,23 +12,47 @@
 <body>
 
   <!-- Navbar -->
-  <header class="navbar">
+  <header class="navbar" id="navbar">
     <div class="container nav-wrapper">
       <a href="#" class="brand">Solusi<span>Aset</span>Properti</a>
-      <nav class="nav-links">
+      <button class="mobile-toggle" id="mobileToggle" aria-label="Buka Menu">&#9776;</button>
+      <nav class="nav-links" id="navLinks">
+        <a href="#keunggulan">Keunggulan</a>
         <a href="#katalog">Katalog Properti</a>
-        <a href="https://instagram.com/solusi.asetproperti" target="_blank">@solusi.asetproperti</a>
-        <a href="https://wa.me/628212334550?text=Halo%20Widy,%20saya%20ingin%20konsultasi%20properti%20di%20Bandung%20Raya" target="_blank" class="btn-nav">Jadwalkan Survey</a>
+        <a href="#cara-pesan">Alur Survey</a>
+        <a href="https://instagram.com/solusi.asetproperti" target="_blank" rel="noopener">@solusi.asetproperti</a>
+        <a href="https://wa.me/628212334550?text=Halo%20Widy,%20saya%20ingin%20konsultasi%20properti%20di%20Bandung%20Raya" target="_blank" rel="noopener" class="btn-nav">Jadwalkan Survey</a>
       </nav>
     </div>
   </header>
 
   <!-- Hero Section -->
   <section class="hero">
-    <div class="container">
-      <span class="hero-badge">KONSULTAN &amp; PEMASARAN PROPERTI BANDUNG RAYA</span>
-      <h1>Temukan Hunian Nyaman &amp; Investasi Tanah Strategis di Bandung</h1>
-      <p>Pilihan rumah siap huni, inden desain custom, dan kavling legalitas aman (SHM) di kawasan berkembang Bandung, Cimahi, Ciparay, hingga Bandung Barat.</p>
+    <div class="hero-overlay"></div>
+    <div class="container hero-content">
+      <span class="hero-badge">KONSULTAN & PEMASARAN PROPERTI BANDUNG RAYA</span>
+      <h1>Temukan Hunian Nyaman & Kavling Investasi Strategis di Bandung</h1>
+      <p>Pilihan rumah siap huni, inden desain custom, dan tanah kavling SHM pecah siap bangun di Bandung, Cimahi, Ciparay, hingga Bandung Barat.</p>
+      <div class="hero-cta-group">
+        <a href="#katalog" class="btn-primary">Lihat Katalog Listing</a>
+        <a href="https://wa.me/628212334550?text=Halo%20Widy,%20boleh%20minta%20rekomendasi%20properti%20sesuai%20budget%20saya?" target="_blank" rel="noopener" class="btn-outline">Konsultasi Gratis</a>
+      </div>
+
+      <!-- Statistik Singkat -->
+      <div class="hero-stats">
+        <div class="stat-box">
+          <strong>100%</strong>
+          <span>Legalitas Terverifikasi (SHM)</span>
+        </div>
+        <div class="stat-box">
+          <strong>Bandung Raya</strong>
+          <span>Cakupan Lokasi Pilihan</span>
+        </div>
+        <div class="stat-box">
+          <strong>Pendampingan</strong>
+          <span>Survey Lokasi Hingga Akad</span>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -36,23 +60,35 @@
   <section class="filter-section">
     <div class="container">
       <div class="filter-card">
-        <input type="text" id="searchInput" placeholder="Cari lokasi atau judul (misal: Ciparay, Sagaracipta, Arcamanik, Cimahi)..." />
-        <select id="kategoriFilter">
-          <option value="">Semua Kategori</option>
-          <option value="Rumah">Rumah</option>
-          <option value="Kavling Tanah">Kavling Tanah</option>
-          <option value="Ruko">Ruko</option>
-          <option value="Apartemen">Apartemen</option>
-          <option value="Villa">Villa</option>
-        </select>
-        <select id="statusFilter">
-          <option value="">Semua Status</option>
-          <option value="Tersedia">Tersedia</option>
-          <option value="Promo">Promo</option>
-          <option value="Booking Fee">Booking Fee</option>
-          <option value="Terjual">Terjual</option>
-        </select>
-        <button class="btn-filter" onclick="applyFilters()">Cari Properti</button>
+        <div class="filter-group">
+          <label for="searchInput">Cari Lokasi atau Nama Proyek</label>
+          <input type="text" id="searchInput" placeholder="Ketik Ciparay, Sagaracipta, Arcamanik, Cimahi..." />
+        </div>
+        <div class="filter-group">
+          <label for="kategoriFilter">Kategori</label>
+          <select id="kategoriFilter">
+            <option value="">Semua Kategori</option>
+            <option value="Rumah">Rumah</option>
+            <option value="Kavling Tanah">Kavling Tanah</option>
+            <option value="Ruko">Ruko</option>
+            <option value="Apartemen">Apartemen</option>
+            <option value="Villa">Villa</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="statusFilter">Status</label>
+          <select id="statusFilter">
+            <option value="">Semua Status</option>
+            <option value="Tersedia">Tersedia</option>
+            <option value="Promo">Promo</option>
+            <option value="Booking Fee">Booking Fee</option>
+            <option value="Terjual">Terjual</option>
+          </select>
+        </div>
+        <div class="filter-action">
+          <button class="btn-filter" onclick="applyFilters()">Filter Unit</button>
+          <button class="btn-reset" onclick="resetFilters()" title="Reset Filter">&#8635;</button>
+        </div>
       </div>
     </div>
   </section>
@@ -60,8 +96,21 @@
   <!-- Daftar Listing Properti -->
   <main class="container" id="katalog">
     <div class="section-header">
-      <h2>Listing Properti Pilihan</h2>
-      <span class="listing-count" id="listingCount">Memuat properti...</span>
+      <div>
+        <span class="section-subtitle">UPDATE TERBARU DARI PAGES CMS</span>
+        <h2>Listing Properti Pilihan</h2>
+      </div>
+      <div class="header-controls">
+        <span class="listing-count" id="listingCount">Memuat properti...</span>
+      </div>
+    </div>
+
+    <!-- Quick Filter Chips -->
+    <div class="chip-bar" id="chipBar">
+      <button class="chip active" data-kat="">Semua Unit</button>
+      <button class="chip" data-kat="Rumah">Rumah</button>
+      <button class="chip" data-kat="Kavling Tanah">Kavling Tanah</button>
+      <button class="chip" data-kat="Ruko">Ruko</button>
     </div>
 
     <div class="listing-grid" id="listingGrid">
@@ -69,59 +118,102 @@
     </div>
   </main>
 
+  <!-- Keunggulan Layanan -->
+  <section class="features-section" id="keunggulan">
+    <div class="container">
+      <div class="section-header center">
+        <span class="section-subtitle">MENGAPA MEMILIH KAMI</span>
+        <h2>Aman Bertransaksi, Tepat Memilih Lokasi</h2>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">&#128220;</div>
+          <h3>Legalitas Jelas & Aman</h3>
+          <p>Setiap unit rumah dan tanah kavling dipastikan memiliki dokumen legalitas sah (SHM/PBG) siap cek keabsahan.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128205;</div>
+          <h3>Riset Lokasi Strategis</h3>
+          <p>Kurasi properti dekat akses jalan utama, kampus, fasilitas pendidikan, dan kawasan pertumbuhan ekonomi Bandung Raya.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#129309;</div>
+          <h3>Pendampingan Penuh</h3>
+          <p>Bantuan konsultasi skema pembayaran (Cash Keras, Bertahap, maupun KPR) dan pendampingan survey langsung ke lokasi.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Alur Pemesanan -->
+  <section class="steps-section" id="cara-pesan">
+    <div class="container">
+      <div class="section-header center">
+        <span class="section-subtitle">MUDAH & TRANSPARAN</span>
+        <h2>3 Langkah Memiliki Properti Impian</h2>
+      </div>
+      <div class="steps-grid">
+        <div class="step-item">
+          <span class="step-num">01</span>
+          <h3>Pilih Unit & Konsultasi</h3>
+          <p>Bandingkan spesifikasi unit di katalog kami dan diskusikan kebutuhan luas maupun skema pembayaran via WhatsApp.</p>
+        </div>
+        <div class="step-item">
+          <span class="step-num">02</span>
+          <h3>Jadwalkan Survey Lokasi</h3>
+          <p>Cek langsung kondisi fisik bangunan atau kontur lahan kavling, akses jalan, serta lingkungan sekitar bersama tim kami.</p>
+        </div>
+        <div class="step-item">
+          <span class="step-num">03</span>
+          <h3>Booking & Proses Akad</h3>
+          <p>Kunci unit pilihan Anda dengan booking fee resmi dan lanjutkan proses pemberkasan hingga serah terima kunci/sertifikat.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Modal Detail Properti -->
-  <div class="modal" id="propertyModal">
+  <div class="modal" id="propertyModal" onclick="handleBackdropClick(event)">
     <div class="modal-content">
-      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <button class="modal-close" onclick="closeModal()" aria-label="Tutup">&times;</button>
       <div id="modalBody"></div>
     </div>
   </div>
+
+  <!-- Floating WhatsApp Button -->
+  <a href="https://wa.me/628212334550?text=Halo%20Widy,%20saya%20ingin%20bertanya%20tentang%20listing%20properti" target="_blank" rel="noopener" class="floating-wa" aria-label="Chat WhatsApp">
+    <span>Chat WhatsApp</span>
+  </a>
 
   <!-- Footer -->
   <footer class="footer">
     <div class="container">
       <div class="footer-grid">
         <div>
-          <h3>Solusi Aset Properti</h3>
-          <p>Layanan pemasaran dan konsultasi properti terpercaya untuk area Bandung Raya, Cimahi, Ciparay, dan sekitarnya. Pendampingan survey lokasi hingga akad legalitas.</p>
+          <a href="#" class="brand footer-brand">Solusi<span>Aset</span>Properti</a>
+          <p class="footer-desc">Layanan pemasaran dan konsultasi properti terpercaya untuk area Bandung Raya, Cimahi, Ciparay, dan sekitarnya. Pendampingan survey lokasi hingga akad legalitas.</p>
         </div>
         <div>
-          <h3>Hubungi Kami</h3>
+          <h3>Navigasi</h3>
+          <ul class="footer-links">
+            <li><a href="#katalog">Katalog Properti</a></li>
+            <li><a href="#keunggulan">Keunggulan Kami</a></li>
+            <li><a href="#cara-pesan">Alur Survey</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Kontak Resmi</h3>
           <p>WhatsApp: <strong>0821 2334 550</strong></p>
           <p>Instagram: <strong>@solusi.asetproperti</strong></p>
+          <p>Area Layanan: Bandung, Cimahi & Bandung Barat</p>
         </div>
       </div>
       <div class="footer-bottom">
-        &copy; 2026 Solusi Aset Properti. Dikelola dengan Pages CMS.
+        &copy; 2026 Solusi Aset Properti. Dikelola dengan Pages CMS &amp; Node.js.
       </div>
     </div>
   </footer>
 
-  <script>
-    const WA_NUMBER = '628212334550';
-    let allListings = [];
-    let currentFiltered = [];
-
-    // Fallback data default sesuai postingan Pages CMS terbaru
-    const fallbackListings = [
-      {
-        title: "Diskon Hemat Rp 94,5 Juta Kavling Investasi Sagaracipta Hanya Rp 850 Ribu/m²",
-        harga: "Rp 229,5 Juta (Rp 850 Ribu/m²)",
-        kategori: "Kavling Tanah",
-        status: "Promo",
-        lokasi: "Sagaracipta, Ciparay, Bandung Raya",
-        luas_tanah: 270,
-        luas_bangunan: 0,
-        kamar_tidur: 0,
-        kamar_mandi: 0,
-        legalitas: "SHM Pecah Siap Bangun",
-        gambar_utama: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80",
-        galeri: [],
-        fitur_unggulan: [
-          "Harga Normal Rp 1,2 Juta/m² (Rp 324 Juta) — Diskon jadi Rp 850 Ribu/m² (Rp 229,5 Juta), Hemat Rp 94,5 Juta",
-          "Legalitas SHM sudah pecah per unit dan siap balik nama",
-          "Kontur tanah datar siap langsung bangun tanpa perlu urug",
-          "Jalan lingkungan sudah dicor beton mulus dan berada di jalur aktif",
-          "Selangkah menuju SDN Negeri Sagaracipta & dekat Kantor Desa Sagaracipta"
-        ],
-        deskripsi: "Kesempatan emas memiliki aset tanah kavling
+  <script src="app.js"></script>
+</body>
+</html>
