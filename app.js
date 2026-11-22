@@ -1,22 +1,8 @@
 const WA_NUMBER = '628212334550';
 
-// Deteksi otomatis username GitHub & nama repo dari URL GitHub Pages (*.github.io/nama-repo/)
-// Jika memakai custom domain, isi manual owner dan repo di bawah ini.
-function detectGitHubRepo() {
-  const host = window.location.hostname;
-  const pathParts = window.location.pathname.split('/').filter(Boolean);
-  if (host.endsWith('.github.io')) {
-    const owner = host.replace('.github.io', '');
-    const repo = pathParts.length > 0 ? pathParts[0] : `${owner}.github.io`;
-    return { owner, repo };
-  }
-  return { owner: '', repo: '' };
-}
-
-const detected = detectGitHubRepo();
 const GITHUB_CONFIG = {
-  owner: detected.owner || 'iklanproperti', // Isi manual jika pakai custom domain (misal: 'adsmosfer')
-  repo: detected.repo || 'iklanproperti.github.io',   // Isi manual jika pakai custom domain (misal: 'properti-bandung')
+  owner: 'iklanproperti',
+  repo: 'iklanproperti.github.io',
   branch: 'main',
   folder: 'content/properti'
 };
@@ -24,6 +10,7 @@ const GITHUB_CONFIG = {
 let allListings = [];
 let currentFiltered = [];
 
+// Parser YAML Frontmatter yang mendukung string, angka, list (- item), maupun inline array (["a", "b"])
 function parseFrontmatterClient(raw) {
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { data: {}, body: raw };
@@ -33,77 +20,98 @@ function parseFrontmatterClient(raw) {
   let currentKey = null;
 
   for (const line of lines) {
-    if (!line.trim() || line.trim().startsWith('#')) continue;
-    if (line.startsWith('  - ') && currentKey) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    // Tangani item array YAML (- item atau   - item)
+    if (trimmed.startsWith('- ') && currentKey) {
       if (!Array.isArray(data[currentKey])) data[currentKey] = [];
-      data[currentKey].push(line.replace('  - ', '').trim().replace(/^["']|["']$/g, ''));
-    } else {
-      const idx = line.indexOf(':');
-      if (idx !== -1) {
-        const key = line.slice(0, idx).trim();
-        let val = line.slice(idx + 1).trim();
-        currentKey = key;
-        if (val === '') {
-          data[key] = [];
-        } else {
-          val = val.replace(/^["']|["']$/g, '');
-          if (!isNaN(val) && val !== '') val = Number(val);
-          data[key] = val;
-        }
+      const itemVal = trimmed.replace(/^-\s*/, '').replace(/^["']|["']$/g, '');
+      data[currentKey].push(itemVal);
+      continue;
+    }
+
+    const idx = line.indexOf(':');
+    if (idx !== -1) {
+      const key = line.slice(0, idx).trim();
+      let val = line.slice(idx + 1).trim();
+      currentKey = key;
+
+      if (val === '') {
+        data[key] = [];
+      } else if (val.startsWith('[') && val.endsWith(']')) {
+        // Tangani inline array: ["A", "B"]
+        const inner = val.slice(1, -1).trim();
+        data[key] = inner
+          ? inner.split(',').map(s => s.trim().replace(/^["']|["']$/g, ''))
+          : [];
+      } else {
+        val = val.replace(/^["']|["']$/g, '');
+        if (!isNaN(val) && val !== '') val = Number(val);
+        data[key] = val;
       }
     }
   }
+
   return { data, body: match[2].trim() };
 }
 
-// Ambil gambar dari field Pages CMS (gambar_utama / coverImage / thumbnail)
-function getFeaturedImage(item) {
-  const rawImg = item.gambar_utama || item.coverImage || item.thumbnail || item.image || item.foto || '';
+// Ubah markdown sederhana pada body deskripsi menjadi HTML rapi
+function formatBodyHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/\n/g, '<br>')
+    .replace(/^/, '<p>')
+    .replace(/$/, '</p>');
+}
+
+// Resolusi path gambar dari Pages CMS ke URL raw GitHub
+function resolveImageUrl(rawImg) {
   if (!rawImg) return '';
   if (rawImg.startsWith('http://') || rawImg.startsWith('https://')) return rawImg;
 
   const cleanPath = rawImg.replace(/^\/+/, '');
-  if (GITHUB_CONFIG.owner && GITHUB_CONFIG.repo) {
-    return `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${encodeURI(cleanPath)}`;
-  }
-  return encodeURI(cleanPath);
+  return `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${encodeURI(cleanPath)}`;
 }
 
-function resolveGalleryImage(imgPath) {
-  if (!imgPath) return '';
-  if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) return imgPath;
-  const cleanPath = imgPath.replace(/^\/+/, '');
-  if (GITHUB_CONFIG.owner && GITHUB_CONFIG.repo) {
-    return `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${encodeURI(cleanPath)}`;
-  }
-  return encodeURI(cleanPath);
+function getFeaturedImage(item) {
+  const rawImg = item.gambar_utama || item.coverImage || item.thumbnail || item.image || item.foto || '';
+  return resolveImageUrl(rawImg);
 }
 
 // Ambil seluruh postingan .md langsung dari folder Pages CMS di GitHub
 async function fetchFromPagesCMS() {
-  if (!GITHUB_CONFIG.owner || !GITHUB_CONFIG.repo) return null;
-
   const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.folder}?ref=${GITHUB_CONFIG.branch}&t=${Date.now()}`;
   const res = await fetch(apiUrl);
-  if (!res.ok) return null;
+  if (!res.ok) {
+    throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
+  }
 
   const files = await res.json();
-  if (!Array.isArray(files)) return null;
+  if (!Array.isArray(files)) return [];
 
   const mdFiles = files.filter(f => f.name.endsWith('.md'));
-  const items = await Promise.all(mdFiles.map(async f => {
-    const mdRes = await fetch(`${f.download_url}?t=${Date.now()}`);
-    const text = await mdRes.text();
-    const { data, body } = parseFrontmatterClient(text);
-    return { slug: f.name.replace(/\.md$/, ''), ...data, deskripsi: body };
-  }));
+  const items = await Promise.all(
+    mdFiles.map(async f => {
+      const mdRes = await fetch(`${f.download_url}?t=${Date.now()}`);
+      const text = await mdRes.text();
+      const { data, body } = parseFrontmatterClient(text);
+      return {
+        slug: f.name.replace(/\.md$/, ''),
+        ...data,
+        deskripsi: body
+      };
+    })
+  );
 
   return items.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 }
 
 async function loadListings() {
   const count = document.getElementById('listingCount');
-  count.textContent = 'Menyinkronkan listing dari Pages CMS...';
+  if (count) count.textContent = 'Menyinkronkan listing dari Pages CMS...';
 
   // 1. Ambil langsung dari folder content/properti Pages CMS di GitHub
   try {
@@ -118,7 +126,7 @@ async function loadListings() {
     console.warn('Gagal mengambil langsung dari GitHub API, beralih ke data/listings.json:', e);
   }
 
-  // 2. Fallback ke data/listings.json hasil build Node.js dari postingan Pages CMS
+  // 2. Fallback ke data/listings.json jika tersedia
   try {
     const res = await fetch(`data/listings.json?t=${Date.now()}`, { cache: 'no-store' });
     if (res.ok) {
@@ -134,7 +142,7 @@ async function loadListings() {
     console.warn('Gagal memuat data/listings.json:', e);
   }
 
-  // 3. Jika belum ada satu pun postingan di Pages CMS
+  // 3. Jika belum ada postingan
   allListings = [];
   currentFiltered = [];
   renderListings([]);
@@ -143,7 +151,7 @@ async function loadListings() {
 function renderListings(items) {
   const grid = document.getElementById('listingGrid');
   const count = document.getElementById('listingCount');
-  count.textContent = `Menampilkan ${items.length} properti`;
+  if (count) count.textContent = `Menampilkan ${items.length} properti`;
 
   if (items.length === 0) {
     grid.innerHTML = `
@@ -159,7 +167,9 @@ function renderListings(items) {
     const isKavling = (item.kategori || '').toLowerCase().includes('kavling');
     const statusClass = item.status === 'Terjual' ? 'terjual' : '';
     const imgUrl = getFeaturedImage(item);
-    const waText = encodeURIComponent(`Halo Widy, saya tertarik dengan properti "${item.title}" (${item.harga}) di ${item.lokasi}. Boleh minta info detail & jadwal survey?`);
+    const waText = encodeURIComponent(
+      `Halo Widy, saya tertarik dengan properti "${item.title}" (${item.harga}) di ${item.lokasi}. Boleh minta info detail & jadwal survey?`
+    );
 
     const spec3 = isKavling
       ? `<div class="spec-item"><strong>Siap Bangun</strong>Kondisi Lahan</div>`
@@ -204,7 +214,8 @@ function applyFilters() {
   });
 
   currentFiltered = allListings.filter(item => {
-    const matchKeyword = !keyword ||
+    const matchKeyword =
+      !keyword ||
       (item.title && item.title.toLowerCase().includes(keyword)) ||
       (item.lokasi && item.lokasi.toLowerCase().includes(keyword)) ||
       (item.deskripsi && item.deskripsi.toLowerCase().includes(keyword));
@@ -220,6 +231,9 @@ function resetFilters() {
   document.getElementById('searchInput').value = '';
   document.getElementById('kategoriFilter').value = '';
   document.getElementById('statusFilter').value = '';
+  document.querySelectorAll('.chip').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.kat === '');
+  });
   loadListings();
 }
 
@@ -229,22 +243,28 @@ function openModal(idx) {
 
   const isKavling = (item.kategori || '').toLowerCase().includes('kavling');
   const mainImg = getFeaturedImage(item);
-  const waText = encodeURIComponent(`Halo Widy, saya ingin jadwalkan survey untuk "${item.title}" (${item.harga}) di ${item.lokasi}.`);
+  const waText = encodeURIComponent(
+    `Halo Widy, saya ingin jadwalkan survey untuk "${item.title}" (${item.harga}) di ${item.lokasi}.`
+  );
 
-  const galeriHtml = Array.isArray(item.galeri) && item.galeri.length > 0
-    ? `<div class="modal-gallery">
-        ${mainImg ? `<img src="${mainImg}" alt="Utama" onclick="document.getElementById('modalMainImg').src='${mainImg}'" />` : ''}
-        ${item.galeri.map(g => {
-          const gUrl = resolveGalleryImage(g);
-          return gUrl ? `<img src="${gUrl}" alt="Galeri" onclick="document.getElementById('modalMainImg').src='${gUrl}'" />` : '';
-        }).join('')}
-      </div>`
-    : '';
+  const galeriHtml =
+    Array.isArray(item.galeri) && item.galeri.length > 0
+      ? `<div class="modal-gallery">
+          ${mainImg ? `<img src="${mainImg}" alt="Utama" onclick="document.getElementById('modalMainImg').src='${mainImg}'" />` : ''}
+          ${item.galeri
+            .map(g => {
+              const gUrl = resolveImageUrl(g);
+              return gUrl ? `<img src="${gUrl}" alt="Galeri" onclick="document.getElementById('modalMainImg').src='${gUrl}'" />` : '';
+            })
+            .join('')}
+        </div>`
+      : '';
 
-  const fiturHtml = Array.isArray(item.fitur_unggulan) && item.fitur_unggulan.length > 0
-    ? `<h4 style="color: var(--navy); margin-top: 16px;">Keunggulan Lokasi & Fasilitas:</h4>
-       <ul class="modal-features">${item.fitur_unggulan.map(f => `<li>${f}</li>`).join('')}</ul>`
-    : '';
+  const fiturHtml =
+    Array.isArray(item.fitur_unggulan) && item.fitur_unggulan.length > 0
+      ? `<h4 style="color: var(--navy); margin-top: 16px;">Keunggulan Lokasi & Fasilitas:</h4>
+         <ul class="modal-features">${item.fitur_unggulan.map(f => `<li>${f}</li>`).join('')}</ul>`
+      : '';
 
   document.getElementById('modalBody').innerHTML = `
     ${mainImg ? `<img src="${mainImg}" alt="${item.title}" class="modal-img" id="modalMainImg" />` : ''}
@@ -264,14 +284,58 @@ function openModal(idx) {
       <div><strong>${item.legalitas || 'SHM'}</strong>Legalitas</div>
     </div>
 
-    <div class="modal-desc">${item.deskripsi || ''}</div>
+    <div class="modal-desc">${formatBodyHtml(item.deskripsi)}</div>
     ${fiturHtml}
 
     <div style="margin-top: 24px;">
-      <a href="https://wa.me/${WA_NUMBER}?text=${waText}" target="_blank" rel="noopener" class="btn-wa" style="display:block; padding: 15px; font-size: 1rem;">
+      <a href="https://wa.me/${WA_NUMBER}?text=${waText}" target="_blank" rel="noopener" class="btn-wa" style="display:block; padding: 15px; font-size: 1rem; text-align:center;">
         Jadwalkan Survey via WhatsApp (0821 2334 550)
       </a>
     </div>
   `;
 
-  document.getElementById('propertyModal').classList
+  document.getElementById('propertyModal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('propertyModal').classList.remove('active');
+}
+
+function handleBackdropClick(e) {
+  if (e.target.id === 'propertyModal') {
+    closeModal();
+  }
+}
+
+// Tutup modal dengan tombol ESC
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// Toggle menu mobile di navbar
+const mobileToggle = document.getElementById('mobileToggle');
+const navLinks = document.getElementById('navLinks');
+if (mobileToggle && navLinks) {
+  mobileToggle.addEventListener('click', () => {
+    navLinks.classList.toggle('active');
+  });
+}
+
+// Event Listener Chip Kategori Cepat
+document.querySelectorAll('.chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('kategoriFilter').value = btn.dataset.kat;
+    applyFilters();
+  });
+});
+
+// Jalankan filter saat menekan Enter di kotak pencarian
+const searchInput = document.getElementById('searchInput');
+if (searchInput) {
+  searchInput.addEventListener('keyup', e => {
+    if (e.key === 'Enter') applyFilters();
+  });
+}
+
+// Muat data listing otomatis saat halaman terbuka
+document.addEventListener('DOMContentLoaded', loadListings);
