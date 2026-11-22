@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solusi Aset Properti | Katalog Rumah & Kavling Bandung Raya</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Navbar -->
+  <header class="navbar">
+    <div class="container nav-wrapper">
+      <a href="#" class="brand">Solusi<span>Aset</span>Properti</a>
+      <nav class="nav-links">
+        <a href="#katalog">Katalog Properti</a>
+        <a href="https://instagram.com/solusi.asetproperti" target="_blank">@solusi.asetproperti</a>
+        <a href="https://wa.me/628212334550?text=Halo%20Widy,%20saya%20ingin%20konsultasi%20properti%20di%20Bandung%20Raya" target="_blank" class="btn-nav">Jadwalkan Survey</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <span class="hero-badge">KONSULTAN &amp; PEMASARAN PROPERTI BANDUNG RAYA</span>
+      <h1>Temukan Hunian Nyaman &amp; Investasi Tanah Strategis di Bandung</h1>
+      <p>Pilihan rumah siap huni, inden desain custom, dan kavling legalitas aman (SHM) di kawasan berkembang Bandung, Cimahi, Ciparay, hingga Bandung Barat.</p>
+    </div>
+  </section>
+
+  <!-- Filter Pencarian -->
+  <section class="filter-section">
+    <div class="container">
+      <div class="filter-card">
+        <input type="text" id="searchInput" placeholder="Cari lokasi atau judul (misal: Ciparay, Sagaracipta, Arcamanik, Cimahi)..." />
+        <select id="kategoriFilter">
+          <option value="">Semua Kategori</option>
+          <option value="Rumah">Rumah</option>
+          <option value="Kavling Tanah">Kavling Tanah</option>
+          <option value="Ruko">Ruko</option>
+          <option value="Apartemen">Apartemen</option>
+          <option value="Villa">Villa</option>
+        </select>
+        <select id="statusFilter">
+          <option value="">Semua Status</option>
+          <option value="Tersedia">Tersedia</option>
+          <option value="Promo">Promo</option>
+          <option value="Booking Fee">Booking Fee</option>
+          <option value="Terjual">Terjual</option>
+        </select>
+        <button class="btn-filter" onclick="applyFilters()">Cari Properti</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Daftar Listing Properti -->
+  <main class="container" id="katalog">
+    <div class="section-header">
+      <h2>Listing Properti Pilihan</h2>
+      <span class="listing-count" id="listingCount">Memuat properti...</span>
+    </div>
+
+    <div class="listing-grid" id="listingGrid">
+      <!-- Kartu properti dirender otomatis dari data/listings.json -->
+    </div>
+  </main>
+
+  <!-- Modal Detail Properti -->
+  <div class="modal" id="propertyModal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h3>Solusi Aset Properti</h3>
+          <p>Layanan pemasaran dan konsultasi properti terpercaya untuk area Bandung Raya, Cimahi, Ciparay, dan sekitarnya. Pendampingan survey lokasi hingga akad legalitas.</p>
+        </div>
+        <div>
+          <h3>Hubungi Kami</h3>
+          <p>WhatsApp: <strong>0821 2334 550</strong></p>
+          <p>Instagram: <strong>@solusi.asetproperti</strong></p>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        &copy; 2026 Solusi Aset Properti. Dikelola dengan Pages CMS.
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const WA_NUMBER = '628212334550';
+    let allListings = [];
+    let currentFiltered = [];
+
+    // Fallback data default sesuai postingan Pages CMS terbaru
+    const fallbackListings = [
+      {
+        title: "Diskon Hemat Rp 94,5 Juta Kavling Investasi Sagaracipta Hanya Rp 850 Ribu/m²",
+        harga: "Rp 229,5 Juta (Rp 850 Ribu/m²)",
+        kategori: "Kavling Tanah",
+        status: "Promo",
+        lokasi: "Sagaracipta, Ciparay, Bandung Raya",
+        luas_tanah: 270,
+        luas_bangunan: 0,
+        kamar_tidur: 0,
+        kamar_mandi: 0,
+        legalitas: "SHM Pecah Siap Bangun",
+        gambar_utama: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80",
+        galeri: [],
+        fitur_unggulan: [
+          "Harga Normal Rp 1,2 Juta/m² (Rp 324 Juta) — Diskon jadi Rp 850 Ribu/m² (Rp 229,5 Juta), Hemat Rp 94,5 Juta",
+          "Legalitas SHM sudah pecah per unit dan siap balik nama",
+          "Kontur tanah datar siap langsung bangun tanpa perlu urug",
+          "Jalan lingkungan sudah dicor beton mulus dan berada di jalur aktif",
+          "Selangkah menuju SDN Negeri Sagaracipta & dekat Kantor Desa Sagaracipta"
+        ],
+        deskripsi: "Kesempatan emas memiliki aset tanah kavling
