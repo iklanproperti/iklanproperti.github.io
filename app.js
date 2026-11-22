@@ -1,9 +1,9 @@
 const WA_NUMBER = '628212334550';
 
-// Opsional: Isi jika ingin beranda otomatis membaca folder content/properti langsung dari GitHub
+// Isi username GitHub & nama repo Anda agar beranda membaca folder content/properti secara real-time
 const GITHUB_CONFIG = {
-  owner: '', // Contoh: 'adsmosfer'
-  repo: '',  // Contoh: 'properti-bandung'
+  owner: 'iklanproperti', // Contoh: 'adsmosfer'
+  repo: 'iklanproperti.github.io',  // Contoh: 'properti-bandung'
   branch: 'main',
   folder: 'content/properti'
 };
@@ -67,15 +67,38 @@ function parseFrontmatterClient(raw) {
   return { data, body: match[2].trim() };
 }
 
-function resolveImagePath(imgPath) {
-  if (!imgPath) return "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80";
-  if (imgPath.startsWith("http")) return imgPath;
-  return imgPath.replace(/^\//, "");
+// Ambil gambar dari berbagai kemungkinan nama field di Pages CMS
+function getFeaturedImage(item) {
+  const rawImg = item.gambar_utama || item.coverImage || item.thumbnail || item.image || item.foto || '';
+  if (!rawImg) {
+    return "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=900&q=80";
+  }
+  if (rawImg.startsWith("http://") || rawImg.startsWith("https://")) {
+    return rawImg;
+  }
+
+  const cleanPath = rawImg.replace(/^\/+/, "");
+
+  if (GITHUB_CONFIG.owner && GITHUB_CONFIG.repo) {
+    return `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${encodeURI(cleanPath)}`;
+  }
+
+  return encodeURI(cleanPath);
+}
+
+function resolveGalleryImage(imgPath) {
+  if (!imgPath) return '';
+  if (imgPath.startsWith("http://") || imgPath.startsWith("https://")) return imgPath;
+  const cleanPath = imgPath.replace(/^\/+/, "");
+  if (GITHUB_CONFIG.owner && GITHUB_CONFIG.repo) {
+    return `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${encodeURI(cleanPath)}`;
+  }
+  return encodeURI(cleanPath);
 }
 
 async function fetchDirectFromGitHub() {
   if (!GITHUB_CONFIG.owner || !GITHUB_CONFIG.repo) return null;
-  const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.folder}?ref=${GITHUB_CONFIG.branch}`;
+  const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.folder}?ref=${GITHUB_CONFIG.branch}&t=${Date.now()}`;
   const res = await fetch(apiUrl);
   if (!res.ok) return null;
 
@@ -93,6 +116,16 @@ async function fetchDirectFromGitHub() {
 
 async function loadListings() {
   try {
+    const ghData = await fetchDirectFromGitHub();
+    if (ghData && ghData.length > 0) {
+      allListings = ghData;
+      currentFiltered = [...allListings];
+      renderListings(currentFiltered);
+      return;
+    }
+  } catch (e) {}
+
+  try {
     const res = await fetch(`data/listings.json?t=${Date.now()}`, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
@@ -102,16 +135,6 @@ async function loadListings() {
         renderListings(currentFiltered);
         return;
       }
-    }
-  } catch (e) {}
-
-  try {
-    const ghData = await fetchDirectFromGitHub();
-    if (ghData && ghData.length > 0) {
-      allListings = ghData;
-      currentFiltered = [...allListings];
-      renderListings(currentFiltered);
-      return;
     }
   } catch (e) {}
 
@@ -138,7 +161,7 @@ function renderListings(items) {
   grid.innerHTML = items.map((item, idx) => {
     const isKavling = (item.kategori || '').toLowerCase().includes('kavling');
     const statusClass = item.status === 'Terjual' ? 'terjual' : '';
-    const imgUrl = resolveImagePath(item.gambar_utama);
+    const imgUrl = getFeaturedImage(item);
     const waText = encodeURIComponent(`Halo Widy, saya tertarik dengan properti "${item.title}" (${item.harga}) di ${item.lokasi}. Boleh minta info detail & jadwal survey?`);
 
     const spec3 = isKavling
@@ -148,7 +171,7 @@ function renderListings(items) {
     return `
       <article class="property-card">
         <div class="card-image">
-          <img src="${imgUrl}" alt="${item.title}" loading="lazy" />
+          <img src="${imgUrl}" alt="${item.title}" loading="lazy" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=900&q=80';" />
           <div class="badge-group">
             <span class="badge badge-kategori">${item.kategori || 'Properti'}</span>
             <span class="badge badge-status ${statusClass}">${item.status || 'Tersedia'}</span>
@@ -208,14 +231,14 @@ function openModal(idx) {
   if (!item) return;
 
   const isKavling = (item.kategori || '').toLowerCase().includes('kavling');
-  const mainImg = resolveImagePath(item.gambar_utama);
+  const mainImg = getFeaturedImage(item);
   const waText = encodeURIComponent(`Halo Widy, saya ingin jadwalkan survey untuk "${item.title}" (${item.harga}) di ${item.lokasi}.`);
 
   const galeriHtml = Array.isArray(item.galeri) && item.galeri.length > 0
     ? `<div class="modal-gallery">
         <img src="${mainImg}" alt="Utama" onclick="document.getElementById('modalMainImg').src='${mainImg}'" />
         ${item.galeri.map(g => {
-          const gUrl = resolveImagePath(g);
+          const gUrl = resolveGalleryImage(g);
           return `<img src="${gUrl}" alt="Galeri" onclick="document.getElementById('modalMainImg').src='${gUrl}'" />`;
         }).join('')}
       </div>`
@@ -227,7 +250,7 @@ function openModal(idx) {
     : '';
 
   document.getElementById('modalBody').innerHTML = `
-    <img src="${mainImg}" alt="${item.title}" class="modal-img" id="modalMainImg" />
+    <img src="${mainImg}" alt="${item.title}" class="modal-img" id="modalMainImg" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=900&q=80';" />
     ${galeriHtml}
     <div style="display:flex; gap:8px; margin-bottom:10px;">
       <span class="badge badge-kategori">${item.kategori || 'Properti'}</span>
